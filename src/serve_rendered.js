@@ -18,7 +18,6 @@ const Color = require('color');
 const express = require('express');
 const mercator = new (require('@mapbox/sphericalmercator'))();
 const mbgl = require('@mapbox/mapbox-gl-native');
-const MBTiles = require('@mapbox/mbtiles');
 const proj4 = require('proj4');
 const request = require('request');
 
@@ -275,22 +274,6 @@ module.exports = {
           if (err) {
             console.error(err);
             return res.status(500).send(err);
-          }
-
-          // Fix semi-transparent outlines on raw, premultiplied input
-          // https://github.com/maptiler/tileserver-gl/issues/350#issuecomment-477857040
-          for (var i = 0; i < data.length; i += 4) {
-            var alpha = data[i + 3];
-            var norm = alpha / 255;
-            if (alpha === 0) {
-              data[i] = 0;
-              data[i + 1] = 0;
-              data[i + 2] = 0;
-            } else {
-              data[i] = data[i] / norm;
-              data[i + 1] = data[i + 1] / norm;
-              data[i + 2] = data[i + 2] / norm;
-            }
           }
 
           const image = sharp(data, {
@@ -550,20 +533,9 @@ module.exports = {
       });
     }
 
-    app.get('/:id.json', (req, res, next) => {
-      const item = repo[req.params.id];
-      if (!item) {
-        return res.sendStatus(404);
-      }
-      const info = clone(item.tileJSON);
-      info.tiles = utils.getTileUrls(req, info.tiles,
-        `styles/${req.params.id}`, info.format, item.publicUrl);
-      return res.send(info);
-    });
-
     return Promise.all([fontListingPromise]).then(() => app);
   },
-  add: (options, repo, params, id, publicUrl, dataResolver) => {
+  add: (options, repo, params, id, publicUrl) => {
     const map = {
       renderers: [],
       sources: {}
@@ -594,43 +566,6 @@ module.exports = {
                 callback(null, { data: concated });
               }, err => {
                 callback(err, { data: null });
-              });
-            } else if (protocol === 'mbtiles') {
-              const parts = req.url.split('/');
-              const sourceId = parts[2];
-              const source = map.sources[sourceId];
-              const sourceInfo = styleJSON.sources[sourceId];
-              const z = parts[3] | 0,
-                x = parts[4] | 0,
-                y = parts[5].split('.')[0] | 0,
-                format = parts[5].split('.')[1];
-              source.getTile(z, x, y, (err, data, headers) => {
-                if (err) {
-                  if (options.verbose) console.log('MBTiles error, serving empty', err);
-                  createEmptyResponse(sourceInfo.format, sourceInfo.color, callback);
-                  return;
-                }
-
-                const response = {};
-                if (headers['Last-Modified']) {
-                  response.modified = new Date(headers['Last-Modified']);
-                }
-
-                if (format === 'pbf') {
-                  try {
-                    response.data = zlib.unzipSync(data);
-                  } catch (err) {
-                    console.log("Skipping incorrect header for tile mbtiles://%s/%s/%s/%s.pbf", id, z, x, y);
-                  }
-                  if (options.dataDecoratorFunc) {
-                    response.data = options.dataDecoratorFunc(
-                      sourceId, 'data', response.data, z, x, y);
-                  }
-                } else {
-                  response.data = data;
-                }
-
-                callback(null, response);
               });
             } else if (protocol === 'http' || protocol === 'https') {
               request({
@@ -707,7 +642,6 @@ module.exports = {
         }
       }
     }
-
     const tileJSON = {
       'tilejson': '2.0.0',
       'name': styleJSON.name,
@@ -736,73 +670,6 @@ module.exports = {
     for (const name of Object.keys(styleJSON.sources)) {
       let source = styleJSON.sources[name];
       const url = source.url;
-
-      if (url && url.lastIndexOf('mbtiles:', 0) === 0) {
-        // found mbtiles source, replace with info from local file
-        delete source.url;
-
-        let mbtilesFile = url.substring('mbtiles://'.length);
-        const fromData = mbtilesFile[0] === '{' &&
-          mbtilesFile[mbtilesFile.length - 1] === '}';
-
-        if (fromData) {
-          mbtilesFile = mbtilesFile.substr(1, mbtilesFile.length - 2);
-          const mapsTo = (params.mapping || {})[mbtilesFile];
-          if (mapsTo) {
-            mbtilesFile = mapsTo;
-          }
-          mbtilesFile = dataResolver(mbtilesFile);
-          if (!mbtilesFile) {
-            console.error(`ERROR: data "${mbtilesFile}" not found!`);
-            process.exit(1);
-          }
-        }
-
-        queue.push(new Promise((resolve, reject) => {
-          mbtilesFile = path.resolve(options.paths.mbtiles, mbtilesFile);
-          const mbtilesFileStats = fs.statSync(mbtilesFile);
-          if (!mbtilesFileStats.isFile() || mbtilesFileStats.size === 0) {
-            throw Error(`Not valid MBTiles file: ${mbtilesFile}`);
-          }
-          map.sources[name] = new MBTiles(mbtilesFile, err => {
-            map.sources[name].getInfo((err, info) => {
-              if (err) {
-                console.error(err);
-                return;
-              }
-
-              if (!repo[id].dataProjWGStoInternalWGS && info.proj4) {
-                // how to do this for multiple sources with different proj4 defs?
-                const to3857 = proj4('EPSG:3857');
-                const toDataProj = proj4(info.proj4);
-                repo[id].dataProjWGStoInternalWGS = xy => to3857.inverse(toDataProj.forward(xy));
-              }
-
-              const type = source.type;
-              Object.assign(source, info);
-              source.type = type;
-              source.tiles = [
-                // meta url which will be detected when requested
-                `mbtiles://${name}/{z}/{x}/{y}.${info.format || 'pbf'}`
-              ];
-              delete source.scheme;
-
-              if (options.dataDecoratorFunc) {
-                source = options.dataDecoratorFunc(name, 'tilejson', source);
-              }
-
-              if (!attributionOverride &&
-                source.attribution && source.attribution.length > 0) {
-                if (tileJSON.attribution.length > 0) {
-                  tileJSON.attribution += '; ';
-                }
-                tileJSON.attribution += source.attribution;
-              }
-              resolve();
-            });
-          });
-        }));
-      }
     }
 
     const renderersReadyPromise = Promise.all(queue).then(() => {

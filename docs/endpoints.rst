@@ -2,28 +2,12 @@
 Available endpoints
 ===================
 
-If you visit the server on the configured port (default 8080) you can see your maps appearing in the browser.
-
-Styles
-======
-* Styles are served at ``/styles/{id}/style.json`` (+ array at ``/styles.json``)
-
-  * Sprites at ``/styles/{id}/sprite[@2x].{format}``
-  * Fonts at ``/fonts/{fontstack}/{start}-{end}.pbf``
-
 Rendered tiles
 ==============
 * Rendered tiles are served at ``/styles/{id}/{z}/{x}/{y}[@2x].{format}``
 
   * The optional ``@2x`` (or ``@3x``, ``@4x``) part can be used to render HiDPI (retina) tiles
   * Available formats: ``png``, ``jpg`` (``jpeg``), ``webp``
-  * TileJSON at ``/styles/{id}.json``
-
-* The rendered tiles are not available in the ``tileserver-gl-light`` version.
-
-WMTS Capabilities
-==============
-* WMTS Capabilities are served at ``/styles/{id}/wmts.xml``
 
 Static images
 =============
@@ -50,24 +34,6 @@ Static images
 * You can also use (experimental) ``/styles/{id}/static/raw/...`` endpoints with raw spherical mercator coordinates (EPSG:3857) instead of WGS84.
 
 * The static images are not available in the ``tileserver-gl-light`` version.
-
-Source data
-===========
-* Source data are served at ``/data/{mbtiles}/{z}/{x}/{y}.{format}``
-
-  * Format depends on the source file (usually ``png`` or ``pbf``)
-
-    * ``geojson`` is also available (useful for inspecting the tiles) in case the original format is ``pbf``
-
-  * TileJSON at ``/data/{mbtiles}.json``
-
-TileJSON arrays
-===============
-Array of all TileJSONs is at ``/index.json`` (``/rendered.json``; ``/data.json``)
-
-List of available fonts
-=======================
-Array of names of the available fonts is at ``/fonts.json``
 
 Health check
 ============

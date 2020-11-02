@@ -13,12 +13,7 @@ Example::
         "fonts": "fonts",
         "sprites": "sprites",
         "styles": "styles",
-        "mbtiles": ""
       },
-      "domains": [
-        "localhost:8080",
-        "127.0.0.1:8080"
-      ],
       "formatQuality": {
         "jpeg": 80,
         "webp": 90
@@ -26,8 +21,6 @@ Example::
       "maxScaleFactor": 3,
       "maxSize": 2048,
       "pbfAlias": "pbf",
-      "serveAllFonts": false,
-      "serveAllStyles": false,
       "serveStaticMaps": true,
       "tileMargin": 0
     },
@@ -38,22 +31,8 @@ Example::
           "type": "overlay",
           "bounds": [8.44806, 47.32023, 8.62537, 47.43468]
         }
-      },
-      "hybrid": {
-        "style": "satellite-hybrid.json",
-        "serve_rendered": false,
-        "tilejson": {
-          "format": "webp"
-        }
       }
-    },
-    "data": {
-      "zurich-vector": {
-        "mbtiles": "zurich.mbtiles"
-      }
-    }
   }
-
 
 ``options``
 ===========
@@ -64,19 +43,6 @@ Example::
 Defines where to look for the different types of input data.
 
 The value of ``root`` is used as prefix for all data types.
-
-``domains``
------------
-
-You can use this to optionally specify on what domains the rendered tiles are accessible. This can be used for basic load-balancing or to bypass browser's limit for the number of connections per domain.
-
-``frontPage``
------------------
-
-Path to the html (relative to ``root`` path) to use as a front page.
-
-Use ``true`` (or nothing) to serve the default TileServer GL front page with list of styles and data.
-Use ``false`` to disable the front page altogether (404).
 
 ``formatQuality``
 -----------------
@@ -125,13 +91,6 @@ If you have plenty of memory, try setting these equal to or slightly above your 
 If you need to conserve memory, try lower values for scale factors that are less common.
 Default is ``[16, 8, 4]``.
 
-``serveAllStyles``
-------------------------
-
-If this option is enabled, all the styles from the ``paths.styles`` will be served. (No recursion, only ``.json`` files are used.)
-The process will also watch for changes in this directory and remove/add more styles dynamically.
-It is recommended to also use the ``serveAllFonts`` option when using this option.
-
 ``watermark``
 -----------
 
@@ -146,43 +105,7 @@ Each item in this object defines one style (map). It can have the following opti
 
 * ``style`` -- name of the style json file [required]
 * ``serve_rendered`` -- whether to render the raster tiles for this style or not
-* ``serve_data`` -- whether to allow acces to the original tiles, sprites and required glyphs
-* ``tilejson`` -- properties to add to the TileJSON created for the raster data
-
   * ``format`` and ``bounds`` can be especially useful
-
-``data``
-========
-
-Each item specifies one data source which should be made accessible by the server. It has the following options:
-
-* ``mbtiles`` -- name of the mbtiles file [required]
-
-The mbtiles file does not need to be specified here unless you explicitly want to serve the raw data.
-
-Referencing local files from style JSON
-=======================================
-
-You can link various data sources from the style JSON (for example even remote TileJSONs).
-
-MBTiles
--------
-
-To specify that you want to use local mbtiles, use to following syntax: ``mbtiles://switzerland.mbtiles``.
-The TileServer-GL will try to find the file ``switzerland.mbtiles`` in ``root`` + ``mbtiles`` path.
-
-For example::
-
-  "sources": {
-    "source1": {
-      "url": "mbtiles://switzerland.mbtiles",
-      "type": "vector"
-    }
-  }
-
-Alternatively, you can use ``mbtiles://{zurich-vector}`` to reference existing data object from the config.
-In this case, the server will look into the ``config.json`` to determine what mbtiles file to use.
-For the config above, this is equivalent to ``mbtiles://zurich.mbtiles``.
 
 Sprites
 -------
